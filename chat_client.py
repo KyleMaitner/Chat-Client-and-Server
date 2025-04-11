@@ -144,25 +144,25 @@ class ChatClient:
             msg_type (str): Either "self" for user messages or "other".
     """
     def display_message(self, message, msg_type):
-        #apply emoji replacements before displaying
         message = replace_emoji_shortcuts(message)
-
-        # Enable text area, insert message
         self.text_area.configure(state='normal')
+
+        # Record current end index BEFORE inserting message
+        start_index = self.text_area.index(tk.END + "-1c")
+
+        # Insert the message
         if msg_type == "self":
             self.text_area.insert(tk.END, message + "\n", "self")
         else:
             self.text_area.insert(tk.END, message + "\n")
-       
-        #Make links clickable
-        self.make_links_click(message, msg_type)
 
+        # Make links clickable (pass the full message and start index)
+        self.make_links_click(message, start_index)
 
         self.text_area.configure(state='disabled')
         self.text_area.yview(tk.END)
 
-
-        # Highlight user's own messages
+        # Style self messages
         self.text_area.tag_config("self", background="lightgreen")
 
     """
@@ -188,30 +188,24 @@ class ChatClient:
             text (str): The message containing potential URLs.
             msg_type (str): Message type (not used, but included for future use).
     """
-    def make_links_click(self, text, msg_type):
-        # Regular expression to detect URLs
+    def make_links_click(self, text, start_index):
         url_pattern = r'(https?://[^\s]+)'
+        urls = list(re.finditer(url_pattern, text))
 
+        for match in urls:
+            url = match.group()
+            url_start = match.start()
+            url_end = match.end()
 
-        # Find all URLs in the provided text
-        urls = re.findall(url_pattern, text)
+            # Calculate actual position in the text widget
+            line, char = map(int, start_index.split('.'))
+            start_idx = f"{line}.{char + url_start}"
+            end_idx = f"{line}.{char + url_end}"
 
-
-        # Apply clickable links for each URL
-        for url in urls:
-            start_idx = text.find(url)
-            end_idx = start_idx + len(url)
-
-
-            # Add tag to the URL part of the text
-            self.text_area.tag_add(url, f"1.{start_idx}", f"1.{end_idx}")
+            # Create and bind the tag
+            self.text_area.tag_add(url, start_idx, end_idx)
             self.text_area.tag_config(url, foreground="blue", underline=True)
-
-
-            # Bind the URL to the open_link function
             self.text_area.tag_bind(url, "<Button-1>", lambda e, url=url: self.open_link(url))
-           
-
     """ 
         Opens a given URL in the system's default web browser.
 
@@ -228,7 +222,6 @@ if __name__ == "__main__":
     root = tk.Tk()
     client = ChatClient(root)
     root.mainloop()
-
 
 
 
